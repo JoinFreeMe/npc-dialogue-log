@@ -1,0 +1,16 @@
+{
+  "Name": "NPC Dialogue Log",
+  "Author": "RipZ",
+  "Version": "1.4.0",
+  "Description": "Records every line of NPC dialogue spoken to the player. Press L to review the log.",
+  "UniqueID": "RipZ.NpcDialogueLog",
+  "EntryDll": "NpcDialogueLog.dll",
+  "MinimumApiVersion": "4.0.0",
+  "UpdateKeys": ["CurseForge:1487847"],
+  "Dependencies": [
+    {
+      "UniqueID": "spacechase0.GenericModConfigMenu",
+      "IsRequired": false
+    }
+  ]
+}
