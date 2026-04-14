@@ -1,7 +1,7 @@
 {
-  "Name": "NPC Dialogue Log",
+  "Name": "Dia-Log",
   "Author": "RipZ",
-  "Version": "1.4.0",
+  "Version": "1.5.0",
   "Description": "Records every line of NPC dialogue spoken to the player. Press L to review the log.",
   "UniqueID": "RipZ.NpcDialogueLog",
   "EntryDll": "NpcDialogueLog.dll",

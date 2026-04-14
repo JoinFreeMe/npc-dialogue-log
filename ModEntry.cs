@@ -12,11 +12,20 @@ namespace NpcDialogueLog
     {
         private ModConfig _config = null!;
         private static IMonitor? _monitor;
+        internal static string ModVersion = "";
 
         public override void Entry(IModHelper helper)
         {
             _config = helper.ReadConfig<ModConfig>();
             _monitor = Monitor;
+            ModVersion = ModManifest.Version.ToString();
+
+            // Migrate old default (600) to new default (10000)
+            if (_config.MaxEntries == 600)
+            {
+                _config.MaxEntries = 10000;
+                helper.WriteConfig(_config);
+            }
 
             DialogueLog.Configure(_config.MaxEntries);
 
