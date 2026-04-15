@@ -1,4 +1,4 @@
-# NPC Dialogue Log
+# Dia-Log (former: NPC Dialogue Log)
 
 A Stardew Valley mod that records every line of NPC dialogue spoken to you and lets you review it at any time.
 
