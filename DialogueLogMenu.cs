@@ -214,7 +214,7 @@ namespace NpcDialogueLog
             var used = new HashSet<char>();
             foreach (string n in _npcNames)
             {
-                string d = DisplayOf(n);
+                string d = BucketOf(n);
                 if (d.Length > 0) used.Add(char.ToUpper(d[0]));
             }
 
@@ -237,15 +237,20 @@ namespace NpcDialogueLog
             _visibleNpcs.Clear();
             foreach (string n in _npcNames)
             {
-                string d = DisplayOf(n);
+                string bucket = BucketOf(n);
 
                 if (_activeLetter.HasValue &&
-                    (d.Length == 0 || char.ToUpper(d[0]) != _activeLetter.Value))
+                    (bucket.Length == 0 || char.ToUpper(bucket[0]) != _activeLetter.Value))
                     continue;
 
-                if (_sidebarSearch.Length > 0 &&
-                    !d.Contains(_sidebarSearch, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                if (_sidebarSearch.Length > 0)
+                {
+                    string display = DisplayOf(n);
+                    bool matches =
+                        display.Contains(_sidebarSearch, StringComparison.OrdinalIgnoreCase) ||
+                        n.Contains(_sidebarSearch, StringComparison.OrdinalIgnoreCase);
+                    if (!matches) continue;
+                }
 
                 _visibleNpcs.Add(n);
             }
@@ -521,7 +526,7 @@ namespace NpcDialogueLog
             // ── Header: portrait + NPC name ──
             string headerName = _selectedNpc == null
                 ? "All Dialogue"
-                : DisplayOf(_selectedNpc);
+                : HeaderNameOf(_selectedNpc);
 
             Texture2D? headerPort = null;
             if (_selectedNpc != null)
@@ -637,7 +642,7 @@ namespace NpcDialogueLog
                 int textLeft = contentX + EntryPortOff;
 
                 // Header: NPC name + date
-                string header = DisplayOf(entry.NpcName);
+                string header = HeaderNameOf(entry.NpcName);
                 if (!string.IsNullOrEmpty(entry.Date))
                     header += $"  \u2022  {entry.Date}";
                 b.DrawString(Game1.smallFont, header,
@@ -982,8 +987,27 @@ namespace NpcDialogueLog
 
         private string DisplayOf(string npcName)
         {
-            if (ModEntry.UseInternalNames) return npcName;
             return _displayNames.TryGetValue(npcName, out var dn) ? dn : npcName;
+        }
+
+        // Used for A-Z letter bucketing only. UseInternalNames keeps the
+        // English alphabet column functional in non-Latin locales (JP/KR/ZH)
+        // without changing what the user actually sees in row labels.
+        private string BucketOf(string npcName)
+        {
+            if (ModEntry.UseInternalNames) return npcName;
+            return DisplayOf(npcName);
+        }
+
+        // Header label for the right-hand panel and entry rows. When
+        // UseInternalNames is on, appends the internal name in parens for
+        // disambiguation: "アビゲイル (Abigail)".
+        private string HeaderNameOf(string npcName)
+        {
+            string display = DisplayOf(npcName);
+            if (ModEntry.UseInternalNames && display != npcName)
+                return $"{display} ({npcName})";
+            return display;
         }
 
         /// Returns the portrait for an NPC. Prefers the live NPC.Portrait
