@@ -13,12 +13,14 @@ namespace NpcDialogueLog
         private ModConfig _config = null!;
         private static IMonitor? _monitor;
         internal static string ModVersion = "";
+        internal static string ModFolderPath = "";
 
         public override void Entry(IModHelper helper)
         {
             _config = helper.ReadConfig<ModConfig>();
             _monitor = Monitor;
             ModVersion = ModManifest.Version.ToString();
+            ModFolderPath = helper.DirectoryPath;
 
             // Migrate old default (600) to new default (10000)
             if (_config.MaxEntries == 600)
@@ -104,13 +106,13 @@ namespace NpcDialogueLog
         }
 
         [HarmonyPostfix]
-        static void NPC_ShowTextAboveHead_Postfix(NPC __instance, string Text)
+        static void NPC_ShowTextAboveHead_Postfix(NPC __instance, string text)
         {
             try
             {
                 if (!_overheadEnabled) return;
-                if (__instance == null || string.IsNullOrWhiteSpace(Text)) return;
-                DialogueLog.Add(__instance, Text);
+                if (__instance == null || string.IsNullOrWhiteSpace(text)) return;
+                DialogueLog.Add(__instance, text);
             }
             catch (Exception ex)
             {

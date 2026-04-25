@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using StardewValley;
 
@@ -68,6 +71,32 @@ namespace NpcDialogueLog
         public static void AddNarrator(string rawText)
         {
             Add(null, rawText);
+        }
+
+        public static string ExportAsText()
+        {
+            var sb = new StringBuilder();
+            foreach (var e in _entries)
+            {
+                sb.Append(e.DisplayName);
+                if (!string.IsNullOrEmpty(e.Date))
+                    sb.Append("  •  ").Append(e.Date);
+                sb.AppendLine();
+                sb.AppendLine(e.Text);
+                sb.AppendLine();
+            }
+            return sb.ToString();
+        }
+
+        public static string ExportAsJson()
+        {
+            return JsonSerializer.Serialize(_entries, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                // Default escaping turns apostrophes into ', kanji into \uXXXX, etc.
+                // Relaxed escaping keeps these readable while still escaping the JSON-required set.
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
         }
 
         private static string CleanText(string raw)

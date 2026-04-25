@@ -79,6 +79,8 @@ namespace NpcDialogueLog
         private Dictionary<DialogueEntry, int> _entryIndex = new();
 
         private ClickableTextureComponent _closeBtn = null!;
+        private Rectangle _exportBtnRect;
+        private ExportDialog? _exportDialog;
         private Rectangle _discordRect;  // clickable area for "Discord" word only
         private const string DiscordUrl = "https://discord.com/invite/aCE6HqfCHj";
         private const string FooterPrefix = "Join us on ";
@@ -172,6 +174,12 @@ namespace NpcDialogueLog
             _sidebarSearchRect = new Rectangle(npcX, searchTop, npcW, SearchH);
             int listTop = _sidebarSearchRect.Bottom + 4;
             _npcListRect = new Rectangle(npcX, listTop, npcW, inY + inH - listTop);
+
+            // Export button: sits on the same row as "All", right side of the sidebar
+            const int exportBtnW = 72;
+            _exportBtnRect = new Rectangle(
+                npcX + npcW - exportBtnW - 2, inY + 6,
+                exportBtnW, NpcRowH - 12);
 
             BuildLetterSlots();
 
@@ -308,7 +316,10 @@ namespace NpcDialogueLog
         }
 
         public override void gameWindowSizeChanged(Rectangle oldBounds, Rectangle newBounds)
-            => RebuildLayout();
+        {
+            RebuildLayout();
+            _exportDialog?.gameWindowSizeChanged(oldBounds, newBounds);
+        }
 
         // ── Draw ──────────────────────────────────────────────────────────────
 
@@ -368,7 +379,12 @@ namespace NpcDialogueLog
                 Game1.textColor * 0.7f, 0f, Vector2.Zero, FooterScale, SpriteEffects.None, 0f);
 
             _closeBtn.draw(b);
-            drawMouse(b);
+
+            // Child export dialog draws on top, handles its own mouse cursor
+            if (_exportDialog != null)
+                _exportDialog.draw(b);
+            else
+                drawMouse(b);
         }
 
         private void DrawSidebar(SpriteBatch b)
@@ -395,14 +411,24 @@ namespace NpcDialogueLog
             // ── "All" row (above search, not scrolled) ──
             int allY = _sidebarRect.Y;
             bool allSel = _selectedNpc == null;
-            if (allSel)
-                b.Draw(Game1.fadeToBlackRect,
-                    new Rectangle(_npcListRect.X, allY, _npcListRect.Width, NpcRowH),
-                    Color.Black * 0.3f);
             b.DrawString(Game1.smallFont, "All",
                 new Vector2(_npcListRect.X + 8,
                             allY + (NpcRowH - Game1.smallFont.LineSpacing) / 2f),
                 allSel ? Color.White : Game1.textColor);
+
+            // Export button (same row as "All", right side of sidebar)
+            int mxE = Game1.getMouseX(), myE = Game1.getMouseY();
+            bool exportHover = _exportBtnRect.Contains(mxE, myE);
+            b.Draw(Game1.fadeToBlackRect, _exportBtnRect,
+                exportHover ? Color.Black * 0.3f : Color.Black * 0.18f);
+            const string exportLabel = "Export";
+            Vector2 expSz = Game1.smallFont.MeasureString(exportLabel);
+            float expScale = 0.85f;
+            b.DrawString(Game1.smallFont, exportLabel,
+                new Vector2(_exportBtnRect.X + (_exportBtnRect.Width - expSz.X * expScale) / 2f,
+                            _exportBtnRect.Y + (_exportBtnRect.Height - expSz.Y * expScale) / 2f),
+                exportHover ? Color.White : Game1.textColor,
+                0f, Vector2.Zero, expScale, SpriteEffects.None, 0f);
 
             // ── Sidebar search bar ──
             b.Draw(Game1.fadeToBlackRect, _sidebarSearchRect,
@@ -708,9 +734,25 @@ namespace NpcDialogueLog
 
         public override void receiveLeftClick(int x, int y, bool playSound = true)
         {
+            if (_exportDialog != null)
+            {
+                _exportDialog.receiveLeftClick(x, y, playSound);
+                if (_exportDialog.IsClosed) _exportDialog = null;
+                return;
+            }
+
             if (_closeBtn.containsPoint(x, y))
             {
                 exitThisMenu();
+                return;
+            }
+
+            if (_exportBtnRect.Contains(x, y))
+            {
+                _sidebarSearchActive = false;
+                _textSearchActive = false;
+                _exportDialog = new ExportDialog();
+                if (playSound) Game1.playSound("smallSelect");
                 return;
             }
 
@@ -861,6 +903,13 @@ namespace NpcDialogueLog
 
         public override void receiveKeyPress(Keys key)
         {
+            if (_exportDialog != null)
+            {
+                _exportDialog.receiveKeyPress(key);
+                if (_exportDialog.IsClosed) _exportDialog = null;
+                return;
+            }
+
             if (_sidebarSearchActive || _textSearchActive)
             {
                 if (key == Keys.Escape)
@@ -924,6 +973,8 @@ namespace NpcDialogueLog
         protected override void cleanupBeforeExit()
         {
             Game1.game1.Window.TextInput -= OnTextInput;
+            _exportDialog?.Close();
+            _exportDialog = null;
             base.cleanupBeforeExit();
         }
 
