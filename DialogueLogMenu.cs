@@ -102,10 +102,7 @@ namespace NpcDialogueLog
                 _displayNames.TryAdd(e.NpcName, e.DisplayName);
 
             foreach (string n in _npcNames)
-            {
-                try   { _portraits[n] = Game1.content.Load<Texture2D>($"Portraits/{n}"); }
-                catch { _portraits[n] = null; }
-            }
+                _portraits[n] = LoadPortrait(n);
 
             RebuildLayout();    // sets _entryRect so wrap width is known
             PrecomputeWrapping();
@@ -936,6 +933,22 @@ namespace NpcDialogueLog
         {
             if (ModEntry.UseInternalNames) return npcName;
             return _displayNames.TryGetValue(npcName, out var dn) ? dn : npcName;
+        }
+
+        /// Returns the portrait for an NPC. Prefers the live NPC.Portrait
+        /// (handles modded NPCs whose assets are loaded via mod frameworks),
+        /// then falls back to the canonical Portraits/{name} asset path.
+        private static Texture2D? LoadPortrait(string name)
+        {
+            try
+            {
+                var npc = Game1.getCharacterFromName(name);
+                if (npc?.Portrait != null) return npc.Portrait;
+            }
+            catch { /* fall through */ }
+
+            try { return Game1.content.Load<Texture2D>($"Portraits/{name}"); }
+            catch { return null; }
         }
 
         private static List<string> WrapText(string text, int maxWidth, SpriteFont font)
