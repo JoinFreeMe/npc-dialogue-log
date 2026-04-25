@@ -29,6 +29,7 @@ namespace NpcDialogueLog
 
             DialogueLog.Configure(_config.MaxEntries);
             _narratorEnabled = _config.LogNarratorDialogue;
+            _overheadEnabled = _config.LogOverheadText;
             UseInternalNames = _config.UseInternalNames;
 
             // Harmony patches
@@ -48,6 +49,11 @@ namespace NpcDialogueLog
                 original: AccessTools.Method(typeof(DialogueBox), nameof(DialogueBox.receiveLeftClick),
                     new[] { typeof(int), typeof(int), typeof(bool) }),
                 prefix: new HarmonyMethod(typeof(ModEntry), nameof(DialogueBox_ReceiveLeftClick_Prefix))
+            );
+            // Overhead text bubbles (e.g. "Hi @!", festival shouts) - opt-in via config
+            harmony.Patch(
+                original: AccessTools.Method(typeof(NPC), nameof(NPC.showTextAboveHead)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(NPC_ShowTextAboveHead_Postfix))
             );
 
             // Events
@@ -98,6 +104,21 @@ namespace NpcDialogueLog
         }
 
         [HarmonyPostfix]
+        static void NPC_ShowTextAboveHead_Postfix(NPC __instance, string Text)
+        {
+            try
+            {
+                if (!_overheadEnabled) return;
+                if (__instance == null || string.IsNullOrWhiteSpace(Text)) return;
+                DialogueLog.Add(__instance, Text);
+            }
+            catch (Exception ex)
+            {
+                _monitor?.Log($"[NpcDialogueLog] Error in showTextAboveHead patch: {ex.Message}", LogLevel.Warn);
+            }
+        }
+
+        [HarmonyPostfix]
         static void DialogueBox_String_Postfix(string dialogue)
         {
             try
@@ -117,6 +138,7 @@ namespace NpcDialogueLog
 
         // Set by Entry() after config load so static postfix can read it
         private static bool _narratorEnabled = false;
+        private static bool _overheadEnabled = false;
 
         // Read by DialogueLogMenu.DisplayOf() to choose internal vs localized NPC names
         internal static bool UseInternalNames = false;
@@ -135,6 +157,7 @@ namespace NpcDialogueLog
                 {
                     Helper.WriteConfig(_config);
                     _narratorEnabled = _config.LogNarratorDialogue;
+                    _overheadEnabled = _config.LogOverheadText;
                     UseInternalNames = _config.UseInternalNames;
                     DialogueLog.Configure(_config.MaxEntries);
                 }
@@ -168,6 +191,14 @@ namespace NpcDialogueLog
 
             gmcm.AddBoolOption(
                 mod: ModManifest,
+                getValue: () => _config.LogOverheadText,
+                setValue: v => _config.LogOverheadText = v,
+                name: () => "Log Overhead Text",
+                tooltip: () => "Also record short text bubbles shown above NPC heads (e.g. \"Hi @!\", festival shouts). Off by default - these fire frequently."
+            );
+
+            gmcm.AddBoolOption(
+                mod: ModManifest,
                 getValue: () => _config.ShowDateInLog,
                 setValue: v => _config.ShowDateInLog = v,
                 name: () => "Show Date in Log",
@@ -188,6 +219,7 @@ namespace NpcDialogueLog
             var saved = Helper.Data.ReadSaveData<List<DialogueEntry>>("dialogue-log");
             DialogueLog.Load(saved);
             _narratorEnabled = _config.LogNarratorDialogue;
+            _overheadEnabled = _config.LogOverheadText;
             UseInternalNames = _config.UseInternalNames;
         }
 
