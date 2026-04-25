@@ -614,7 +614,7 @@ namespace NpcDialogueLog
                 int textLeft = contentX + EntryPortOff;
 
                 // Header: NPC name + date
-                string header = entry.DisplayName;
+                string header = DisplayOf(entry.NpcName);
                 if (!string.IsNullOrEmpty(entry.Date))
                     header += $"  \u2022  {entry.Date}";
                 b.DrawString(Game1.smallFont, header,
@@ -933,7 +933,10 @@ namespace NpcDialogueLog
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private string DisplayOf(string npcName)
-            => _displayNames.TryGetValue(npcName, out var dn) ? dn : npcName;
+        {
+            if (ModEntry.UseInternalNames) return npcName;
+            return _displayNames.TryGetValue(npcName, out var dn) ? dn : npcName;
+        }
 
         private static List<string> WrapText(string text, int maxWidth, SpriteFont font)
         {

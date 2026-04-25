@@ -28,6 +28,8 @@ namespace NpcDialogueLog
             }
 
             DialogueLog.Configure(_config.MaxEntries);
+            _narratorEnabled = _config.LogNarratorDialogue;
+            UseInternalNames = _config.UseInternalNames;
 
             // Harmony patches
             var harmony = new Harmony(ModManifest.UniqueID);
@@ -116,6 +118,9 @@ namespace NpcDialogueLog
         // Set by Entry() after config load so static postfix can read it
         private static bool _narratorEnabled = false;
 
+        // Read by DialogueLogMenu.DisplayOf() to choose internal vs localized NPC names
+        internal static bool UseInternalNames = false;
+
         // ── SMAPI events ───────────────────────────────────────────────────────
 
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
@@ -130,6 +135,7 @@ namespace NpcDialogueLog
                 {
                     Helper.WriteConfig(_config);
                     _narratorEnabled = _config.LogNarratorDialogue;
+                    UseInternalNames = _config.UseInternalNames;
                     DialogueLog.Configure(_config.MaxEntries);
                 }
             );
@@ -167,6 +173,14 @@ namespace NpcDialogueLog
                 name: () => "Show Date in Log",
                 tooltip: () => "Display the in-game date next to each log entry."
             );
+
+            gmcm.AddBoolOption(
+                mod: ModManifest,
+                getValue: () => _config.UseInternalNames,
+                setValue: v => _config.UseInternalNames = v,
+                name: () => "Use Internal NPC Names",
+                tooltip: () => "Show internal English NPC names (e.g. \"Abigail\") instead of localized display names. Affects sidebar, headers, search, and the A-Z letter index."
+            );
         }
 
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
@@ -174,6 +188,7 @@ namespace NpcDialogueLog
             var saved = Helper.Data.ReadSaveData<List<DialogueEntry>>("dialogue-log");
             DialogueLog.Load(saved);
             _narratorEnabled = _config.LogNarratorDialogue;
+            UseInternalNames = _config.UseInternalNames;
         }
 
         private void OnSaving(object? sender, SavingEventArgs e)
