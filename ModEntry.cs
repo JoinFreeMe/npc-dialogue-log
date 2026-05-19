@@ -233,8 +233,13 @@ namespace NpcDialogueLog
         private void OnButtonsChanged(object? sender, ButtonsChangedEventArgs e)
         {
             if (!Context.IsWorldReady) return;
-            if (Game1.activeClickableMenu is DialogueLogMenu) return;
             if (!_config.OpenLogKey.JustPressed()) return;
+
+            if (Game1.activeClickableMenu is DialogueLogMenu openLog)
+            {
+                openLog.exitThisMenu();
+                return;
+            }
 
             var previous = Game1.activeClickableMenu;
             Game1.activeClickableMenu = new DialogueLogMenu(onClose: () =>
