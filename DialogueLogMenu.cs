@@ -89,8 +89,13 @@ namespace NpcDialogueLog
 
         // ── Constructor ───────────────────────────────────────────────────────
 
-        public DialogueLogMenu() : base(0, 0, 0, 0)
+        private readonly Action? _onClose;
+
+        public DialogueLogMenu() : this(null) { }
+
+        public DialogueLogMenu(Action? onClose) : base(0, 0, 0, 0)
         {
+            _onClose = onClose;
             _allEntries = DialogueLog.Entries.ToList();
             _allEntries.Reverse(); // newest first
 
@@ -981,6 +986,7 @@ namespace NpcDialogueLog
             _exportDialog?.Close();
             _exportDialog = null;
             base.cleanupBeforeExit();
+            _onClose?.Invoke();
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
