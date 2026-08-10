@@ -7,9 +7,12 @@ Ever clicked through an NPC's dialogue too fast and wished you could read it aga
 ## Features
 
 - Logs every line of NPC dialogue as it happens
+- Records the expression each line was spoken with, and shows the matching portrait
 - Filter by character using the buttons at the top
-- Scrollable list, newest entries first
+- Search dialogue text, or jump by letter
+- Sort newest-first or oldest-first with one click
 - Persists across sessions - saved per farm file
+- Export the whole log to text or JSON
 - Works at any window size or resolution, including while resizing
 - Multiplayer friendly - each player logs their own dialogue
 - Works with modded NPCs (Stardew Valley Expanded, Ridgeside Village, etc.)
@@ -38,9 +41,13 @@ A `config.json` is created on first launch. You can also configure in-game with 
 | Option | Default | Description |
 |---|---|---|
 | `OpenLogKey` | `L` | Key to open the log |
-| `MaxEntries` | `600` | Maximum entries kept |
+| `MaxEntries` | `10000` | Maximum entries kept |
 | `LogNarratorDialogue` | `false` | Also log dialogue with no NPC speaker |
+| `LogOverheadText` | `false` | Also log short bubbles above NPC heads |
 | `ShowDateInLog` | `true` | Show the in-game date next to each entry |
+| `ShowExpressionInLog` | `true` | Name the expression next to each entry |
+| `NewestFirst` | `true` | Newest entries at the top |
+| `UseInternalNames` | `false` | Use internal English NPC names instead of localized ones |
 
 ## Compatibility
 

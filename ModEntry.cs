@@ -33,6 +33,13 @@ namespace NpcDialogueLog
             _narratorEnabled = _config.LogNarratorDialogue;
             _overheadEnabled = _config.LogOverheadText;
             UseInternalNames = _config.UseInternalNames;
+            NewestFirst = _config.NewestFirst;
+            ShowExpressionInLog = _config.ShowExpressionInLog;
+            SaveSortOrder = v =>
+            {
+                _config.NewestFirst = v;
+                Helper.WriteConfig(_config);
+            };
 
             // Harmony patches
             var harmony = new Harmony(ModManifest.UniqueID);
@@ -76,7 +83,7 @@ namespace NpcDialogueLog
                 // Log page 0 - subsequent pages are caught by DialogueBox_ReceiveLeftClick_Prefix
                 string? text = dialogue.getCurrentDialogue();
                 if (!string.IsNullOrEmpty(text))
-                    DialogueLog.Add(dialogue.speaker, text);
+                    DialogueLog.Add(dialogue.speaker, text, dialogue.getPortraitIndex());
             }
             catch (Exception ex)
             {
@@ -97,7 +104,7 @@ namespace NpcDialogueLog
                 // getCurrentDialogue() returns the page currently on screen, before the click advances it
                 string? text = charDialogue.getCurrentDialogue();
                 if (!string.IsNullOrEmpty(text))
-                    DialogueLog.Add(charDialogue.speaker, text);
+                    DialogueLog.Add(charDialogue.speaker, text, charDialogue.getPortraitIndex());
             }
             catch (Exception ex)
             {
@@ -145,6 +152,13 @@ namespace NpcDialogueLog
         // Read by DialogueLogMenu.DisplayOf() to choose internal vs localized NPC names
         internal static bool UseInternalNames = false;
 
+        // The menu's sort button flips this and calls SaveSortOrder so it persists
+        internal static bool NewestFirst = true;
+        internal static Action<bool>? SaveSortOrder;
+
+        // Read by DialogueLogMenu to decide whether to name the expression in each entry
+        internal static bool ShowExpressionInLog = true;
+
         // ── SMAPI events ───────────────────────────────────────────────────────
 
         private void OnGameLaunched(object? sender, GameLaunchedEventArgs e)
@@ -161,6 +175,8 @@ namespace NpcDialogueLog
                     _narratorEnabled = _config.LogNarratorDialogue;
                     _overheadEnabled = _config.LogOverheadText;
                     UseInternalNames = _config.UseInternalNames;
+                    NewestFirst = _config.NewestFirst;
+                    ShowExpressionInLog = _config.ShowExpressionInLog;
                     DialogueLog.Configure(_config.MaxEntries);
                 }
             );
@@ -178,9 +194,11 @@ namespace NpcDialogueLog
                 getValue: () => _config.MaxEntries,
                 setValue: v => _config.MaxEntries = v,
                 name: () => "Max Entries",
-                tooltip: () => "Maximum number of dialogue entries kept in the log.",
-                min: 10,
-                max: 2000
+                tooltip: () => "Maximum number of dialogue entries kept in the log. Older entries are dropped once the limit is reached.",
+                // Max must reach the config default, or saving here silently trims the log
+                min: 100,
+                max: 10000,
+                interval: 100
             );
 
             gmcm.AddBoolOption(
@@ -209,6 +227,22 @@ namespace NpcDialogueLog
 
             gmcm.AddBoolOption(
                 mod: ModManifest,
+                getValue: () => _config.ShowExpressionInLog,
+                setValue: v => _config.ShowExpressionInLog = v,
+                name: () => "Name Expressions",
+                tooltip: () => "Also write the expression (Happy, Sad, Angry...) next to each logged line as text. The portrait always shows it either way."
+            );
+
+            gmcm.AddBoolOption(
+                mod: ModManifest,
+                getValue: () => _config.NewestFirst,
+                setValue: v => _config.NewestFirst = v,
+                name: () => "Newest Entries First",
+                tooltip: () => "Show the most recent dialogue at the top. Turn off to read oldest to newest. Can also be toggled with the sort button in the log."
+            );
+
+            gmcm.AddBoolOption(
+                mod: ModManifest,
                 getValue: () => _config.UseInternalNames,
                 setValue: v => _config.UseInternalNames = v,
                 name: () => "Use Internal NPC Names",
@@ -223,6 +257,8 @@ namespace NpcDialogueLog
             _narratorEnabled = _config.LogNarratorDialogue;
             _overheadEnabled = _config.LogOverheadText;
             UseInternalNames = _config.UseInternalNames;
+            NewestFirst = _config.NewestFirst;
+            ShowExpressionInLog = _config.ShowExpressionInLog;
         }
 
         private void OnSaving(object? sender, SavingEventArgs e)

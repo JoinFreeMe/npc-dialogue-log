@@ -19,8 +19,7 @@ namespace NpcDialogueLog
         private const int LetterColW   = 22;
         private const int NpcRowH      = 40;
         private const int PortraitSm   = 32;
-        private const int PortraitXs   = 24;  // tiny portrait in dialogue entries
-        private const int PortraitLg   = 48;
+        private const int PortraitLg   = 48;  // header, and the expression portrait on each entry
         private const int HeaderH      = 56;
         private const int SearchH      = 28;
         private const int SbWidth      = 16;
@@ -29,7 +28,8 @@ namespace NpcDialogueLog
         private const int EntryPadBot  = 10;
         private const int HeaderGap    = 6;
         private const int DivW         = 2;
-        private const int EntryPortOff = 30; // horizontal offset for entry text after portrait
+        private const int EntryPortOff = PortraitLg + 8; // horizontal offset for entry text after portrait
+        private const int SortBtnW     = 28; // square sort toggle, sits left of the search box
 
         // ── Data ──────────────────────────────────────────────────────────────
         private readonly List<DialogueEntry>            _allEntries;
@@ -45,6 +45,7 @@ namespace NpcDialogueLog
         private bool    _sidebarSearchActive = false;
         private bool    _textSearchActive    = false;
         private char?   _activeLetter      = null;
+        private bool    _newestFirst       = true;   // newest at the top; toggled by the sort button
         private int     _sidebarScroll     = 0;
         private int     _entryScroll       = 0;
 
@@ -61,6 +62,7 @@ namespace NpcDialogueLog
         private Rectangle _npcListRect;
         private Rectangle _headerRect;
         private Rectangle _textSearchRect;
+        private Rectangle _sortBtnRect;
         private Rectangle _entryRect;
 
         // ── Computed layout data ──────────────────────────────────────────────
@@ -97,7 +99,10 @@ namespace NpcDialogueLog
         {
             _onClose = onClose;
             _allEntries = DialogueLog.Entries.ToList();
-            _allEntries.Reverse(); // newest first
+            // The log is stored oldest-first, so only reverse when showing newest at the top
+            _newestFirst = ModEntry.NewestFirst;
+            if (_newestFirst)
+                _allEntries.Reverse();
 
             _npcNames = _allEntries
                 .Select(e => e.NpcName)
@@ -132,11 +137,19 @@ namespace NpcDialogueLog
             {
                 var entry = _allEntries[i];
                 var lines = WrapText(entry.Text, maxW, Game1.smallFont);
-                int h = EntryPadTop + LineH + HeaderGap + lines.Count * LineH + EntryPadBot;
                 _allWrapped.Add(lines);
-                _allHeights.Add(h);
+                _allHeights.Add(EntryHeight(lines.Count));
                 _entryIndex[entry] = i;
             }
+        }
+
+        /// Height of one entry row: name line, gap, then the wrapped dialogue -
+        /// but never shorter than the portrait sitting beside it.
+        private static int EntryHeight(int lineCount)
+        {
+            int textH = EntryPadTop + LineH + HeaderGap + lineCount * LineH + EntryPadBot;
+            int portraitH = EntryPadTop + PortraitLg + EntryPadBot;
+            return Math.Max(textH, portraitH);
         }
 
         // ── Layout ────────────────────────────────────────────────────────────
@@ -201,6 +214,12 @@ namespace NpcDialogueLog
                 _headerRect.Y + (HeaderH - SearchH) / 2,
                 tsW, SearchH);
 
+            // Sort toggle - square, immediately left of the search box
+            _sortBtnRect = new Rectangle(
+                _textSearchRect.X - SortBtnW - 8,
+                _textSearchRect.Y,
+                SortBtnW, SearchH);
+
             int eTop = _headerRect.Bottom + 8;
             _entryRect = new Rectangle(rpX, eTop, rpW - SbWidth - 4, inY + inH - eTop);
 
@@ -262,6 +281,28 @@ namespace NpcDialogueLog
             _npcTotalH = _visibleNpcs.Count * NpcRowH;
         }
 
+        // ── Sorting ───────────────────────────────────────────────────────────
+
+        /// Flips sort order. The wrapping caches are reversed alongside the entries
+        /// rather than rebuilt, so large logs don't have to re-measure every line.
+        private void ToggleSortOrder()
+        {
+            _newestFirst = !_newestFirst;
+
+            _allEntries.Reverse();
+            _allWrapped.Reverse();
+            _allHeights.Reverse();
+
+            _entryIndex.Clear();
+            for (int i = 0; i < _allEntries.Count; i++)
+                _entryIndex[_allEntries[i]] = i;
+
+            ApplyFilter();   // resets scroll to the top and recomputes heights
+
+            ModEntry.NewestFirst = _newestFirst;
+            ModEntry.SaveSortOrder?.Invoke(_newestFirst);
+        }
+
         // ── Filtering ─────────────────────────────────────────────────────────
 
         private void ApplyFilter()
@@ -307,9 +348,8 @@ namespace NpcDialogueLog
                 {
                     // Fallback for safety
                     var lines = WrapText(entry.Text, maxW, Game1.smallFont);
-                    int h = EntryPadTop + LineH + HeaderGap + lines.Count * LineH + EntryPadBot;
                     _entryLines.Add(lines);
-                    _entryHeights.Add(h);
+                    _entryHeights.Add(EntryHeight(lines.Count));
                 }
                 _entryOffsets.Add(off);
                 off += _entryHeights[^1];
@@ -574,10 +614,28 @@ namespace NpcDialogueLog
                             _textSearchRect.Y + (_textSearchRect.Height - Game1.smallFont.LineSpacing) / 2f),
                 tsColor);
 
-            // Entry count (between name and search)
+            // ── Sort toggle (between count and search) ──
+            int mxS = Game1.getMouseX(), myS = Game1.getMouseY();
+            bool sortHover = _sortBtnRect.Contains(mxS, myS);
+            b.Draw(Game1.fadeToBlackRect, _sortBtnRect,
+                sortHover ? Color.Black * 0.3f : Color.Black * 0.18f);
+
+            // Arrow: down for newest-first, up for oldest-first
+            Color arrowCol = new Color(101, 55, 0) * (sortHover ? 1f : 0.75f);
+            int arrowCx = _sortBtnRect.X + _sortBtnRect.Width / 2;
+            int arrowTop = _sortBtnRect.Y + (_sortBtnRect.Height - 9) / 2;
+            for (int row = 0; row < 3; row++)
+            {
+                int w = _newestFirst ? 12 - row * 4 : 4 + row * 4;
+                b.Draw(Game1.fadeToBlackRect,
+                    new Rectangle(arrowCx - w / 2, arrowTop + row * 3, w, 3),
+                    arrowCol);
+            }
+
+            // Entry count (between name and sort button)
             string countTxt = $"{_filtered.Count} entries";
             Vector2 countSz = Game1.smallFont.MeasureString(countTxt);
-            float countX = _textSearchRect.X - countSz.X - 12;
+            float countX = _sortBtnRect.X - countSz.X - 10;
             if (countX > textX + nameSz.X * nameScale + 8)
                 b.DrawString(Game1.smallFont, countTxt,
                     new Vector2(countX, _headerRect.Y + (HeaderH - countSz.Y) / 2f),
@@ -636,23 +694,35 @@ namespace NpcDialogueLog
                         new Rectangle(_entryRect.X, entryY, _entryRect.Width, entryH - 2),
                         Color.Black * 0.07f);
 
-                // NPC portrait icon in entry
+                // Portrait for this line, showing the expression it was spoken with
                 int contentX = _entryRect.X + 8;
                 if (_portraits.TryGetValue(entry.NpcName, out var tex) && tex != null)
                 {
                     b.Draw(tex,
-                        new Rectangle(contentX, entryY + EntryPadTop, PortraitXs, PortraitXs),
-                        new Rectangle(0, 0, 64, 64), Color.White);
+                        new Rectangle(contentX, entryY + EntryPadTop, PortraitLg, PortraitLg),
+                        PortraitSourceRect(tex, entry.PortraitIndex), Color.White);
                 }
                 int textLeft = contentX + EntryPortOff;
 
-                // Header: NPC name + date
-                string header = HeaderNameOf(entry.NpcName);
+                // Header: name, expression in grey, then date - drawn in pieces so the
+                // expression can carry its own colour
+                var headerPos = new Vector2(textLeft, entryY + EntryPadTop);
+                var headerCol = new Color(101, 55, 0);
+
+                string namePart = HeaderNameOf(entry.NpcName);
+                b.DrawString(Game1.smallFont, namePart, headerPos, headerCol);
+                headerPos.X += Game1.smallFont.MeasureString(namePart).X;
+
+                if (ModEntry.ShowExpressionInLog
+                    && DialogueLog.ExpressionName(entry.PortraitIndex) is string expression)
+                {
+                    string exprPart = $" ({expression.ToLowerInvariant()})";
+                    b.DrawString(Game1.smallFont, exprPart, headerPos, Game1.textColor * 0.45f);
+                    headerPos.X += Game1.smallFont.MeasureString(exprPart).X;
+                }
+
                 if (!string.IsNullOrEmpty(entry.Date))
-                    header += $"  \u2022  {entry.Date}";
-                b.DrawString(Game1.smallFont, header,
-                    new Vector2(textLeft, entryY + EntryPadTop),
-                    new Color(101, 55, 0));
+                    b.DrawString(Game1.smallFont, $"  \u2022  {entry.Date}", headerPos, headerCol);
 
                 // Wrapped dialogue text
                 int textY = entryY + EntryPadTop + LineH + HeaderGap;
@@ -762,6 +832,14 @@ namespace NpcDialogueLog
                 _sidebarSearchActive = false;
                 _textSearchActive = false;
                 _exportDialog = new ExportDialog();
+                if (playSound) Game1.playSound("smallSelect");
+                return;
+            }
+
+            // Sort toggle
+            if (_sortBtnRect.Contains(x, y))
+            {
+                ToggleSortOrder();
                 if (playSound) Game1.playSound("smallSelect");
                 return;
             }
@@ -1030,6 +1108,26 @@ namespace NpcDialogueLog
 
             try { return Game1.content.Load<Texture2D>($"Portraits/{name}"); }
             catch { return null; }
+        }
+
+        /// Source rect for one expression on a portrait sheet. Column count comes from
+        /// the texture, since modded NPCs don't all use vanilla's two-column layout.
+        private static Rectangle PortraitSourceRect(Texture2D tex, int index)
+        {
+            if (index < 0)
+                index = NPC.portrait_neutral_index;
+
+            int cols = Math.Max(1, tex.Width / NPC.portrait_width);
+            var rect = new Rectangle(
+                index % cols * NPC.portrait_width,
+                index / cols * NPC.portrait_height,
+                NPC.portrait_width, NPC.portrait_height);
+
+            // Not every sheet has every expression - fall back rather than draw off the edge
+            if (rect.Right > tex.Width || rect.Bottom > tex.Height)
+                return new Rectangle(0, 0, NPC.portrait_width, NPC.portrait_height);
+
+            return rect;
         }
 
         private static List<string> WrapText(string text, int maxWidth, SpriteFont font)

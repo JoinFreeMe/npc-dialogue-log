@@ -10,6 +10,8 @@ namespace NpcDialogueLog
         public bool LogNarratorDialogue { get; set; } = false;
         public bool LogOverheadText { get; set; } = false;
         public bool ShowDateInLog { get; set; } = true;
+        public bool NewestFirst { get; set; } = true;
+        public bool ShowExpressionInLog { get; set; } = true;
         public bool UseInternalNames { get; set; } = false;
     }
 }
