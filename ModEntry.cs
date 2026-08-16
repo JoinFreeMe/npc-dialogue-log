@@ -68,7 +68,7 @@ namespace NpcDialogueLog
             // Events
             helper.Events.GameLoop.GameLaunched += OnGameLaunched;
             helper.Events.GameLoop.SaveLoaded += OnSaveLoaded;
-            helper.Events.GameLoop.Saving     += OnSaving;
+            helper.Events.GameLoop.DayEnding  += OnDayEnding;
             helper.Events.Input.ButtonsChanged += OnButtonsChanged;
         }
 
@@ -250,9 +250,41 @@ namespace NpcDialogueLog
             );
         }
 
+        // One log file per player, per save.
+        private string LogPath =>
+            $"logs/{Game1.uniqueIDForThisGame:X}-{Game1.player.UniqueMultiplayerID:X}.json";
+
+        private bool _logUnreadable;
+
+        private List<DialogueEntry>? ReadLog()
+        {
+            _logUnreadable = false;
+            try
+            {
+                return Helper.Data.ReadJsonFile<List<DialogueEntry>>(LogPath);
+            }
+            catch (Exception ex)
+            {
+                _logUnreadable = true;
+                Monitor.Log($"Couldn't read the dialogue log, starting empty. {ex.Message}", LogLevel.Warn);
+                return null;
+            }
+        }
+
         private void OnSaveLoaded(object? sender, SaveLoadedEventArgs e)
         {
-            var saved = Helper.Data.ReadSaveData<List<DialogueEntry>>("dialogue-log");
+            var saved = ReadLog();
+
+            // Import logs from earlier versions, which stored them in the save.
+            // Skipped when a log file exists but can't be read, so a damaged file
+            // is never replaced with an older copy.
+            if (saved is null && !_logUnreadable && Context.IsMainPlayer)
+            {
+                saved = Helper.Data.ReadSaveData<List<DialogueEntry>>("dialogue-log");
+                if (saved is not null)
+                    Helper.Data.WriteJsonFile(LogPath, saved);
+            }
+
             DialogueLog.Load(saved);
             _narratorEnabled = _config.LogNarratorDialogue;
             _overheadEnabled = _config.LogOverheadText;
@@ -261,9 +293,10 @@ namespace NpcDialogueLog
             ShowExpressionInLog = _config.ShowExpressionInLog;
         }
 
-        private void OnSaving(object? sender, SavingEventArgs e)
+        // DayEnding is raised for every player; Saving isn't.
+        private void OnDayEnding(object? sender, DayEndingEventArgs e)
         {
-            Helper.Data.WriteSaveData("dialogue-log", DialogueLog.GetSaveData());
+            Helper.Data.WriteJsonFile(LogPath, DialogueLog.GetSaveData());
         }
 
         private void OnButtonsChanged(object? sender, ButtonsChangedEventArgs e)
